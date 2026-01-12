@@ -40,12 +40,45 @@ Inspired by [Tiago Forte's Building a Second Brain](https://www.buildingasecondb
 - AWS account with appropriate permissions
 - GitHub account with GitHub CLI (`gh`) installed and authenticated
 - Python 3.12
+- **uv** (modern Python package manager) installed
 - AWS SAM CLI installed
 - Telegram account
 
+### Installing uv
+
+```bash
+# Install uv (Linux/macOS/Windows WSL)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Or using pip
+pip install uv
+
+# Verify installation
+uv --version
+```
+
 ## 🛠️ Setup Instructions
 
-### 1. Create Telegram Bot
+### 1. Clone and Setup Development Environment
+
+```bash
+# Clone the repository
+git clone https://github.com/twoquarterrican/second-brain-telegram-aws.git
+cd second-brain-telegram-aws
+
+# Create and activate virtual environment with uv
+uv sync
+
+# Activate the virtual environment
+source .venv/bin/activate  # Linux/macOS
+# or
+.venv\Scripts\activate     # Windows
+
+# Install development dependencies (optional)
+uv sync --group dev
+```
+
+### 2. Create Telegram Bot
 
 1. Open Telegram and search for `@BotFather`
 2. Send `/newbot` and follow instructions
@@ -76,13 +109,10 @@ Create a file `env.json` in the project root:
 
 **Security Note**: Store these securely using AWS Secrets Manager in production.
 
-### 3. Deploy with SAM
+### 4. Deploy with SAM
 
 ```bash
-# Navigate to project directory
-cd second-brain-telegram-aws
-
-# Build the application
+# Build the application (SAM will automatically use pyproject.toml dependencies)
 sam build
 
 # Deploy (follow prompts for parameters)
@@ -92,6 +122,8 @@ sam deploy --guided
 sam deploy
 ```
 
+**Note**: AWS SAM automatically reads dependencies from `pyproject.toml`. No separate requirements.txt file needed!
+
 ### 4. Set Up Telegram Webhook
 
 After deployment, get your Processor Lambda URL:
@@ -100,8 +132,11 @@ After deployment, get your Processor Lambda URL:
 # Get the function URL (replace with your function name)
 aws lambda get-function-url-config --function-name SecondBrainProcessor
 
-# Or use the helper script
-python scripts/setup_webhook.py --token YOUR_BOT_TOKEN --secret-token YOUR_SECRET_TOKEN
+# Or use the helper script (uv makes it available as a command)
+setup-webhook --token YOUR_BOT_TOKEN --secret-token YOUR_SECRET_TOKEN
+
+# Or run directly with uv
+uv run scripts/setup_webhook.py --token YOUR_BOT_TOKEN --secret-token YOUR_SECRET_TOKEN
 ```
 
 ### 5. Test Your Bot
@@ -197,6 +232,58 @@ Monitor via AWS CloudWatch:
 - Error rates and timeouts
 - DynamoDB consumption
 - API call metrics
+
+## 🛠️ Development
+
+### Project Structure
+
+```
+second-brain-telegram-aws/
+├── pyproject.toml           # Project metadata and dependencies
+├── .venv/                   # Virtual environment (created by uv)
+├── template.yaml            # AWS SAM template
+├── processor/
+│   └── app.py              # Telegram webhook processor
+├── digest/
+│   └── app.py              # Scheduled digest generator
+├── scripts/
+│   └── setup_webhook.py    # Webhook setup utility
+└── README.md
+```
+
+### Development Commands
+
+```bash
+# Install/update dependencies
+uv sync
+
+# Run scripts in project context
+uv run scripts/setup_webhook.py --info
+
+# Install development tools
+uv sync --group dev
+
+# Format code with black
+uv run black .
+
+# Lint with ruff
+uv run ruff check .
+
+# Type check with mypy
+uv run mypy .
+
+# Run tests (when available)
+uv run pytest
+```
+
+### Dependency Management
+
+This project uses **uv** for modern Python dependency management:
+
+- `pyproject.toml` contains all dependencies and project metadata
+- `uv sync` creates a virtual environment and installs all dependencies
+- Development tools are in `[project.optional-dependencies.dev]`
+- No separate `requirements.txt` needed - SAM reads from `pyproject.toml`
 
 ## 🔄 Git Repository Setup
 
