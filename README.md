@@ -151,17 +151,36 @@ sam deploy
 
 ### 4. Set Up Telegram Webhook
 
-After deployment, get your Processor Lambda URL:
+The easiest way to set up your webhook is using the interactive script:
 
 ```bash
-# Get the function URL (replace with your function name)
+# Launch interactive setup (recommended)
+setup-webhook
+
+# Alternative script names (all do the same thing)
+webhook-setup
+telegram-webhook
+```
+
+The interactive script will guide you through:
+- Entering your bot token
+- Choosing to set, view, delete, or test the webhook
+- Auto-detecting your Lambda function URL from AWS
+- Generating a secure secret token for webhook verification
+- Confirming the configuration before applying changes
+
+#### Manual Setup (Advanced)
+
+If you prefer manual setup:
+
+```bash
+# Get the function URL
 aws lambda get-function-url-config --function-name SecondBrainProcessor
 
-# Or use the helper script (uv makes it available as a command)
-setup-webhook --token YOUR_BOT_TOKEN --secret-token YOUR_SECRET_TOKEN
-
-# Or run directly with uv
-uv run scripts/setup_webhook.py --token YOUR_BOT_TOKEN --secret-token YOUR_SECRET_TOKEN
+# Set webhook manually
+curl -X POST "https://api.telegram.org/botYOUR_BOT_TOKEN/setWebhook" \
+     -H "Content-Type: application/json" \
+     -d '{"url": "YOUR_LAMBDA_URL", "secret_token": "YOUR_SECRET_TOKEN"}'
 ```
 
 ### 5. Test Your Bot
@@ -283,7 +302,9 @@ second-brain-telegram-aws/
 uv sync
 
 # Run scripts in project context
-uv run scripts/setup_webhook.py --info
+setup-webhook           # Interactive webhook setup
+webhook-setup           # Same as above
+telegram-webhook        # Same as above
 
 # Install development tools
 uv sync --group dev

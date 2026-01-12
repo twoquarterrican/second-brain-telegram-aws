@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
 """
-Script to set up Telegram webhook for the Second Brain processor Lambda.
+Interactive script to set up Telegram webhook for Second Brain processor Lambda.
 """
 
 import os
 import sys
-import requests
-import argparse
+import subprocess
+import json
+from typing import Optional
+
+try:
+    from InquirerPy import inquirer
+    from InquirerPy.base import Choice
+except ImportError:
+    print("❌ InquirerPy is required. Install with: pip install InquirerPy")
+    print("   Or run: uv sync")
+    sys.exit(1)
 
 
-def get_function_url(function_name: str, region: str = "us-east-1") -> str:
+def get_function_url(function_name: str, region: str = "us-east-1") -> Optional[str]:
     """Get the Function URL for a Lambda function using AWS CLI"""
-    import subprocess
-
     try:
         result = subprocess.run(
             [
@@ -29,20 +36,20 @@ def get_function_url(function_name: str, region: str = "us-east-1") -> str:
             check=True,
         )
 
-        import json
-
         config = json.loads(result.stdout)
         return config["FunctionUrl"]
     except subprocess.CalledProcessError as e:
-        print(f"Error getting function URL: {e}")
+        print(f"❌ Error getting function URL: {e.stderr}")
         return None
     except json.JSONDecodeError as e:
-        print(f"Error parsing function URL response: {e}")
+        print(f"❌ Error parsing function URL response: {e}")
         return None
 
 
 def set_webhook(bot_token: str, webhook_url: str, secret_token: str = None) -> bool:
     """Set the Telegram webhook"""
+    import requests
+
     url = f"https://api.telegram.org/bot{bot_token}/setWebhook"
 
     payload = {"url": webhook_url}
@@ -54,24 +61,18 @@ def set_webhook(bot_token: str, webhook_url: str, secret_token: str = None) -> b
         result = response.json()
 
         if result.get("ok"):
-            print(f"✅ Webhook set successfully!")
-            print(f"   URL: {webhook_url}")
-            if secret_token:
-                print(f"   Secret token configured")
-            return True
+            return True, "Webhook set successfully!"
         else:
-            print(
-                f"❌ Failed to set webhook: {result.get('description', 'Unknown error')}"
-            )
-            return False
+            return False, result.get("description", "Unknown error")
 
     except Exception as e:
-        print(f"❌ Error setting webhook: {e}")
-        return False
+        return False, str(e)
 
 
 def get_webhook_info(bot_token: str) -> bool:
     """Get current webhook information"""
+    import requests
+
     url = f"https://api.telegram.org/bot{bot_token}/getWebhookInfo"
 
     try:
@@ -79,26 +80,18 @@ def get_webhook_info(bot_token: str) -> bool:
         result = response.json()
 
         if result.get("ok"):
-            info = result["result"]
-            print("📋 Current webhook info:")
-            print(f"   URL: {info.get('url', 'Not set')}")
-            print(f"   Custom certificate: {info.get('has_custom_certificate', False)}")
-            print(f"   Pending update count: {info.get('pending_update_count', 0)}")
-            print(f"   Last error: {info.get('last_error_message', 'None')}")
-            return True
+            return True, result["result"]
         else:
-            print(
-                f"❌ Failed to get webhook info: {result.get('description', 'Unknown error')}"
-            )
-            return False
+            return False, result.get("description", "Unknown error")
 
     except Exception as e:
-        print(f"❌ Error getting webhook info: {e}")
-        return False
+        return False, str(e)
 
 
 def delete_webhook(bot_token: str) -> bool:
     """Delete the Telegram webhook"""
+    import requests
+
     url = f"https://api.telegram.org/bot{bot_token}/deleteWebhook"
 
     try:
@@ -106,70 +99,171 @@ def delete_webhook(bot_token: str) -> bool:
         result = response.json()
 
         if result.get("ok"):
-            print("✅ Webhook deleted successfully!")
-            return True
+            return True, "Webhook deleted successfully!"
         else:
-            print(
-                f"❌ Failed to delete webhook: {result.get('description', 'Unknown error')}"
-            )
-            return False
+            return False, result.get("description", "Unknown error")
 
     except Exception as e:
-        print(f"❌ Error deleting webhook: {e}")
-        return False
+        return False, str(e)
+
+
+def interactive_setup():
+    """Interactive setup using InquirerPy"""
+
+    print("🤖 Telegram Webhook Setup for Second Brain")
+    print("=" * 50)
+
+    # Get bot token
+    bot_token = inquirer.text(
+        message="Enter your Telegram Bot Token:",
+        validate=lambda x: len(x) > 10 and x.isdigit(),
+        invalid_message="Please enter a valid Telegram bot token",
+        transformer=lambda x: f"{x[:15]}..." if len(x) > 15 else x,
+    ).execute()
+
+    # Choose action
+    action = inquirer.select(
+        message="What would you like to do?",
+        choices=[
+            Choice("set", "Set up new webhook"),
+            Choice("info", "Get current webhook info"),
+            Choice("delete", "Delete webhook"),
+            Choice("test", "Test bot connection"),
+        ],
+    ).execute()
+
+    if action == "info":
+        success, result = get_webhook_info(bot_token)
+        if success:
+            print("\n📋 Current webhook info:")
+            print(f"   URL: {result.get('url', 'Not set')}")
+            print(
+                f"   Has custom certificate: {result.get('has_custom_certificate', False)}"
+            )
+            print(f"   Pending updates: {result.get('pending_update_count', 0)}")
+            print(f"   Last error: {result.get('last_error_message', 'None')}")
+            print(f"   Custom secret: {'Yes' if result.get('secret_token') else 'No'}")
+        else:
+            print(f"❌ Failed to get webhook info: {result}")
+        return
+
+    elif action == "delete":
+        confirm = inquirer.confirm(
+            message="Are you sure you want to delete the webhook?", default=False
+        ).execute()
+
+        if confirm:
+            success, message = delete_webhook(bot_token)
+            if success:
+                print(f"✅ {message}")
+            else:
+                print(f"❌ Failed to delete webhook: {message}")
+        else:
+            print("❌ Cancelled.")
+        return
+
+    elif action == "test":
+        print("🔍 Testing bot connection...")
+        success, result = get_webhook_info(bot_token)
+        if success:
+            print(
+                f"✅ Bot is accessible! Webhook URL: {result.get('url', 'Not configured')}"
+            )
+        else:
+            print(f"❌ Failed to connect to bot: {result}")
+        return
+
+    # Set webhook
+    print("🔧 Setting up webhook...")
+
+    # Choose function source
+    webhook_source = inquirer.select(
+        message="How do you want to get the webhook URL?",
+        choices=[
+            Choice("auto", "Auto-detect from AWS"),
+            Choice("manual", "Enter manually"),
+        ],
+    ).execute()
+
+    if webhook_source == "auto":
+        function_name = inquirer.text(
+            message="Lambda function name:",
+            default="SecondBrainProcessor",
+        ).execute()
+
+        region = inquirer.text(
+            message="AWS region:",
+            default="us-east-1",
+        ).execute()
+
+        print("🔍 Getting function URL from AWS...")
+        webhook_url = get_function_url(function_name, region)
+        if not webhook_url:
+            print(
+                "❌ Could not get function URL. Please check AWS CLI configuration and permissions."
+            )
+            return
+    else:
+        webhook_url = inquirer.text(
+            message="Enter webhook URL:",
+            validate=lambda x: x.startswith("https://"),
+            invalid_message="Please enter a valid HTTPS URL",
+        ).execute()
+
+    # Secret token
+    use_secret = inquirer.confirm(
+        message="Use secret token for webhook security?", default=True
+    ).execute()
+
+    secret_token = None
+    if use_secret:
+        if inquirer.confirm("Generate random secret token?", default=True):
+            import secrets
+
+            secret_token = secrets.token_urlsafe(32)
+            print(f"🔑 Generated secret token: {secret_token}")
+        else:
+            secret_token = inquirer.text(
+                message="Enter secret token:",
+                validate=lambda x: len(x) >= 8,
+                invalid_message="Secret token must be at least 8 characters",
+            ).execute()
+
+    # Confirmation
+    print(f"\n📋 Webhook Configuration Summary:")
+    print(f"   Bot Token: {bot_token[:15]}...")
+    print(f"   Webhook URL: {webhook_url}")
+    print(f"   Secret Token: {'Yes' if secret_token else 'No'}")
+
+    if not inquirer.confirm("Proceed with webhook setup?", default=True):
+        print("❌ Cancelled.")
+        return
+
+    # Set webhook
+    print("⏳ Setting webhook...")
+    success, message = set_webhook(bot_token, webhook_url, secret_token)
+
+    if success:
+        print("✅ Webhook set successfully!")
+        print(f"   URL: {webhook_url}")
+        if secret_token:
+            print(f"   Secret token configured")
+        print("\n🎉 Your Second Brain bot is ready to receive messages!")
+    else:
+        print(f"❌ Failed to set webhook: {message}")
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Manage Telegram webhook for Second Brain"
-    )
-    parser.add_argument("--token", required=True, help="Telegram bot token")
-    parser.add_argument(
-        "--function-name", default="SecondBrainProcessor", help="Lambda function name"
-    )
-    parser.add_argument("--region", default="us-east-1", help="AWS region")
-    parser.add_argument("--secret-token", help="Secret token for webhook verification")
-    parser.add_argument(
-        "--webhook-url", help="Custom webhook URL (auto-detected if not provided)"
-    )
-    parser.add_argument("--delete", action="store_true", help="Delete the webhook")
-    parser.add_argument("--info", action="store_true", help="Show current webhook info")
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Skip confirmation for dangerous operations",
-    )
-
-    args = parser.parse_args()
-
-    # Handle info command
-    if args.info:
-        return get_webhook_info(args.token)
-
-    # Handle delete command
-    if args.delete:
-        if not args.force:
-            confirm = input("Are you sure you want to delete the webhook? (y/N): ")
-            if confirm.lower() != "y":
-                print("Cancelled.")
-                return False
-        return delete_webhook(args.token)
-
-    # Set webhook
-    webhook_url = args.webhook_url
-    if not webhook_url:
-        print("🔍 Getting function URL from AWS...")
-        webhook_url = get_function_url(args.function_name, args.region)
-        if not webhook_url:
-            print(
-                "❌ Could not get function URL. Please provide --webhook-url or check AWS CLI configuration."
-            )
-            return False
-
-    print(f"🔧 Setting webhook to: {webhook_url}")
-    return set_webhook(args.token, webhook_url, args.secret_token)
+    """Main entry point"""
+    try:
+        interactive_setup()
+    except KeyboardInterrupt:
+        print("\n\n❌ Setup cancelled by user.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n❌ Unexpected error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1)
+    main()
