@@ -5,7 +5,7 @@ Description: Second Brain System - Telegram Bot + AWS Lambda + DynamoDB + AI Pro
 Globals:
   Function:
     Timeout: 30
-    Runtime: python3.12
+    Runtime: python3.13
     MemorySize: 256
     Environment:
       Variables:

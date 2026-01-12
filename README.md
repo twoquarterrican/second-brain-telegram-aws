@@ -42,8 +42,9 @@ Inspired by [Tiago Forte's Building a Second Brain](https://www.buildingasecondb
 
 - AWS account with appropriate permissions
 - GitHub account with GitHub CLI (`gh`) installed and authenticated
-- Python 3.12
+- Python 3.13
 - **uv** (modern Python package manager) installed
+- **pyenv** for Python version management (optional)
 - AWS SAM CLI installed
 - Telegram account
 
@@ -315,6 +316,22 @@ Solution: Verify API keys are valid, check network connectivity, try fallback AP
 Solution: Verify chat ID, check CloudWatch logs, ensure EventBridge rules are active
 ```
 
+**Python Version Issues**
+```
+Solution: Ensure Python 3.13 is available and active
+
+# Using pyenv:
+python --version
+
+# Using uv with system Python:
+python3 --version  # Should show 3.13.x
+```
+
+**DynamoDB Permission Errors**
+```
+Solution: Check IAM policies, ensure Lambda has proper table access
+```
+
 **Configuration Error Messages**
 ```
 ⚠️ *Configuration Error* or ⚠️ *Digest Error*
@@ -376,25 +393,33 @@ second-brain-telegram-aws/
 # Install/update dependencies
 uv sync
 
-# Run scripts in project context
-setup-webhook           # Interactive webhook setup (default)
-webhook-setup           # Same as above
-telegram-webhook        # Same as above
+# Create and activate virtual environment with uv
+source .venv/bin/activate  # Linux/macOS
+# or
+.venv\Scripts\activate     # Windows
 
-# Install development tools
+# Install development dependencies (optional)
 uv sync --group dev
+```
 
-# Format code with black
-uv run black .
+### Using pyenv (Optional - for Python version management)
 
-# Lint with ruff
-uv run ruff check .
+If you prefer **pyenv** over uv for Python management:
 
-# Type check with mypy
-uv run mypy .
+```bash
+# Install pyenv (if not already installed)
+curl https://pyenv.run | bash
 
-# Run tests (when available)
-uv run pytest
+# Add pyenv to shell
+echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> ~/.bashrc
+echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+
+# Set Python version
+export PATH="$HOME/.pyenv/bin:$PATH" && eval "$(pyenv init -)" && pyenv install 3.13.0
+pyenv global 3.13.0
+
+# Verify installation
+python --version
 ```
 
 ### Dependency Management
