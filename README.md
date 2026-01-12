@@ -106,8 +106,33 @@ Create a file `env.json` in the project root:
 **API Keys**:
 - **Anthropic Claude**: Get from [console.anthropic.com](https://console.anthropic.com/)
 - **OpenAI**: Get from [platform.openai.com](https://platform.openai.com/)
+- **Telegram Secret Token**: Generate a random secret string for webhook verification
 
-**Security Note**: Store these securely using AWS Secrets Manager in production.
+### How to Generate Telegram Secret Token
+
+The `TelegramSecretToken` is a security measure to verify that webhook requests actually come from Telegram. Generate it using one of these methods:
+
+**Method 1: Using Python**
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+**Method 2: Using OpenSSL**
+```bash
+openssl rand -base64 32
+```
+
+**Method 3: Using uuidgen**
+```bash
+uuidgen | tr -d '-'
+```
+
+**Method 4: Online generator**
+- Visit [random.org](https://www.random.org/passwords/) and generate a 32-character random string
+
+**Example secret token**: `a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6`
+
+**Security Note**: Store these securely using AWS Secrets Manager in production. The secret token should be a unique random string that only your bot and Lambda function know.
 
 ### 4. Deploy with SAM
 
